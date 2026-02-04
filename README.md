@@ -1,0 +1,109 @@
+# LiveKit Agents Plugin for SpatialReal Avatar
+
+This plugin provides integration with [SpatialReal](https://spatialreal.com)'s avatar service for lip-synced avatar rendering in LiveKit voice agents.
+
+## Installation
+
+```bash
+pip install livekit-plugins-spatialreal
+```
+
+Or install from source:
+
+```bash
+pip install -e .
+```
+
+## Configuration
+
+Set the following environment variables:
+
+```bash
+# Required
+SPATIALREAL_API_KEY=your-api-key
+SPATIALREAL_APP_ID=your-app-id
+SPATIALREAL_AVATAR_ID=your-avatar-id
+
+# Optional
+SPATIALREAL_CONSOLE_ENDPOINT=
+SPATIALREAL_INGRESS_ENDPOINT=
+
+# LiveKit credentials
+LIVEKIT_URL=
+LIVEKIT_API_KEY=
+LIVEKIT_API_SECRET=
+```
+
+## Usage
+
+```python
+from livekit.agents import Agent, AgentSession, JobContext, cli, WorkerOptions
+from livekit.plugins import spatialreal
+
+class VoiceAssistant(Agent):
+    def __init__(self):
+        super().__init__(
+            instructions="You are a helpful voice assistant."
+        )
+
+async def entrypoint(ctx: JobContext):
+    await ctx.connect()
+
+    # Configure your pipeline components (VAD, STT, LLM, TTS)
+    session = AgentSession(
+        vad=vad,
+        stt=stt,
+        llm=llm,
+        tts=tts,
+    )
+
+    # Initialize and start the avatar session
+    avatar = spatialreal.AvatarSession()
+    await avatar.start(session, room=ctx.room)
+
+    # Start the agent session
+    await session.start(
+        agent=VoiceAssistant(),
+        room=ctx.room,
+    )
+
+if __name__ == "__main__":
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+```
+
+## API Reference
+
+### `AvatarSession`
+
+Main class for integrating SpatialReal avatars with LiveKit agents.
+
+#### Constructor Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `api_key` | `str` | SpatialReal API key (or set `SPATIALREAL_API_KEY`) |
+| `app_id` | `str` | SpatialReal application ID (or set `SPATIALREAL_APP_ID`) |
+| `avatar_id` | `str` | Avatar ID to use (or set `SPATIALREAL_AVATAR_ID`) |
+| `console_endpoint_url` | `str` | Custom console endpoint URL |
+| `ingress_endpoint_url` | `str` | Custom ingress endpoint URL |
+| `avatar_participant_identity` | `str` | LiveKit identity for avatar participant |
+
+#### Methods
+
+- `start(agent_session, room, *, livekit_url, livekit_api_key, livekit_api_secret)`: Start the avatar session and hook into the agent's audio output.
+- `aclose()`: Clean up avatar session resources.
+
+### `SpatialRealException`
+
+Exception raised for SpatialReal-related errors.
+
+## How It Works
+
+1. The plugin intercepts TTS audio output from the agent session
+2. Audio frames are forwarded to SpatialReal's avatar service
+3. SpatialReal generates lip-synced video and audio
+4. The avatar joins the LiveKit room and publishes the synchronized streams
+
+## License
+
+MIT
