@@ -18,7 +18,7 @@ from avatarkit import (
     LiveKitEgressConfig,
     new_avatar_session,
 )
-from livekit.agents import AgentSession
+from livekit.agents import AgentSession, UserStateChangedEvent
 from livekit.agents.voice.avatar import AudioSegmentEnd, QueueAudioOutput
 
 from livekit import rtc
@@ -188,6 +188,12 @@ class AvatarSession:
         @self._audio_buffer.on("clear_buffer")
         def on_clear_buffer() -> None:
             asyncio.create_task(self._handle_interrupt())
+
+        # Register for user_state_changed events (interrupt on user speaking)
+        @agent_session.on("user_state_changed")
+        def on_user_state_changed(ev: UserStateChangedEvent) -> None:
+            if ev.new_state == "speaking":
+                asyncio.create_task(self._handle_interrupt())
 
         # Start the main task that forwards audio to avatar
         self._main_task = asyncio.create_task(self._run_main_task())
