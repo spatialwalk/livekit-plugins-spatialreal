@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Agent Framework plugin for SpatialReal Avatar"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9.0"
+requires-python = ">=3.10.0"
 authors = [{ name = "3DRX", email = "3drxkjy@gmail.com" }]
 keywords = ["voice", "ai", "realtime", "audio", "video", "livekit", "webrtc", "avatar", "spatialreal"]
 classifiers = [
@@ -18,9 +18,11 @@ classifiers = [
     "Topic :: Multimedia :: Video",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
@@ -30,8 +32,8 @@ dependencies = [
 
 [project.urls]
 Documentation = "https://docs.spatialreal.com"
-Website = "https://spatialreal.com/"
-Source = "https://github.com/spatialreal/livekit-plugins-spatialreal"
+Website = "https://www.spatialreal.ai/"
+Source = "https://github.com/spatialwalk/livekit-plugins-spatialreal"
 
 [tool.hatch.version]
 path = "livekit/plugins/spatialreal/version.py"
@@ -43,7 +45,7 @@ packages = ["livekit"]
 include = ["/livekit"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 120
 
 [tool.ruff.lint]
