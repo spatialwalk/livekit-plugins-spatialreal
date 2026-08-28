@@ -791,3 +791,52 @@ def test_segment_rollover_preserves_retained_audio_state() -> None:
     assert target.buffer_start_position == pytest.approx(0.25)
     assert target.playback_position_offset == pytest.approx(0.5)
     assert list(target.audio_frames) == list(source.audio_frames)
+
+
+def test_playback_observation_ignored_while_paused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The egress keeps draining the interrupted attempt for a moment after pause().
+
+    That tail must not be observed as the start of the paused/resumed attempt,
+    otherwise its completion estimate is anchored at the pause instant and
+    playback_finished is reported seconds early.
+    """
+
+    async def run_test() -> None:
+        session = _session()
+        provider = _ProviderSpy()
+        audio = _AudioBufferSpy()
+        segment = _playing_segment()
+        session._avatarkit_session = provider
+        session._audio_buffer = audio
+        session._segments[segment.req_id] = segment
+        session._pending_segment_ids.append(segment.req_id)
+        session._pause_requested = True
+
+        monkeypatch.setattr(avatar.time, "time", lambda: 100.5)
+        await session._handle_pause()
+        assert segment.playback_started is False
+
+        audible = rtc.AudioFrame(data=bytes([0, 4]) * 4, sample_rate=8, num_channels=1, samples_per_channel=4)
+        # still draining: the audible tail of the old attempt must be ignored
+        session._on_avatar_audio_frame(audible)
+        session._on_active_speakers_changed([type("P", (), {"identity": session.avatar_identity, "attributes": {}})()])
+        assert segment.playback_started is False
+        assert segment.playback_started_at is None
+        assert audio.playback_started == 0
+
+        session._pause_requested = False
+        monkeypatch.setattr(avatar.time, "time", lambda: 103.0)
+        await session._handle_resume()
+        resumed = session._segments["request-2"]
+        assert resumed.playback_started is False
+
+        monkeypatch.setattr(avatar.time, "time", lambda: 104.2)
+        session._on_avatar_audio_frame(audible)
+        assert resumed.playback_started is True
+        assert resumed.playback_started_at == pytest.approx(104.2)
+        assert audio.playback_started == 1
+        # completion is anchored at the real resumed start, not the pause instant
+        assert resumed.completion_timeout_task is not None
+        resumed.completion_timeout_task.cancel()
+
+    asyncio.run(run_test())

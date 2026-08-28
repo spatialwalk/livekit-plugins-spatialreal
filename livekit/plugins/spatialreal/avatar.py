@@ -1013,12 +1013,19 @@ class AvatarSession(BaseAvatarSession):
                 "active_speaker_identities": [speaker.identity for speaker in speakers],
             },
         )
-        if not avatar_is_speaking:
+        if not avatar_is_speaking or self._playback_observation_suspended():
             return
 
         segment = self._current_observable_segment()
         if segment is not None:
             self._mark_playback_started(segment, source="livekit_active_speaker")
+
+    def _playback_observation_suspended(self) -> bool:
+        # While a pause is in flight or held, the egress is still draining the
+        # audio of the interrupted attempt. Observing that tail as the start of
+        # the paused/resumed attempt would anchor its completion estimate at the
+        # pause instant and report playback_finished several seconds early.
+        return self._pause_requested or self._paused_segment is not None
 
     def _on_track_published(
         self,
@@ -1104,6 +1111,8 @@ class AvatarSession(BaseAvatarSession):
         return None
 
     def _on_avatar_audio_frame(self, frame: rtc.AudioFrame) -> None:
+        if self._playback_observation_suspended():
+            return
         segment = self._current_observable_segment()
         if segment is None or segment.playback_started:
             return
