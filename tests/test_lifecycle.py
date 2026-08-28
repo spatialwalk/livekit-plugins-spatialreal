@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from avatarkit.proto.generated import message_pb2  # noqa: E402
@@ -21,6 +23,8 @@ from livekit.agents.voice.avatar import QueueAudioOutput  # noqa: E402
 
 from livekit import rtc  # noqa: E402
 from livekit.plugins.spatialreal.avatar import AvatarSession  # noqa: E402
+
+pytestmark = pytest.mark.asyncio
 
 
 class FakeAvatarkitSession:
@@ -117,6 +121,8 @@ async def test_started_precedes_finished_without_signals() -> None:
 
 async def test_remote_track_marks_playback_started() -> None:
     session, fake, buffer = make_session()
+    playback_events = []
+    session.on("playback_started", playback_events.append)
 
     await session._send_audio_frame(make_frame())
 
@@ -133,6 +139,10 @@ async def test_remote_track_marks_playback_started() -> None:
     speech.data[0] = 1200
     session._on_avatar_audio_frame(speech)
     assert buffer.events == ["started"], buffer.events
+    assert len(playback_events) == 1
+    assert playback_events[0].request_id == fake.req_id
+    assert playback_events[0].source == "livekit_avatar_audio_track"
+    assert playback_events[0].observed_at > 0
 
     segment = session._segments[fake.req_id]
     assert segment.playback_start_source == "livekit_avatar_audio_track"
@@ -143,6 +153,8 @@ async def test_remote_track_marks_playback_started() -> None:
 
 async def test_active_speaker_secondary_signal() -> None:
     session, fake, buffer = make_session()
+    playback_events = []
+    session.on("playback_started", playback_events.append)
     session._represented_participant_identity = "agent-1"
 
     await session._send_audio_frame(make_frame())
@@ -155,6 +167,8 @@ async def test_active_speaker_secondary_signal() -> None:
     proxy_avatar = SimpleNamespace(identity="egress-worker", attributes={"lk.publish_on_behalf": "agent-1"})
     session._on_active_speakers_changed([proxy_avatar])
     assert buffer.events == ["started"], buffer.events
+    assert len(playback_events) == 1
+    assert playback_events[0].source == "livekit_active_speaker"
 
     segment = session._segments[fake.req_id]
     assert segment.playback_start_source == "livekit_active_speaker"

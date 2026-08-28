@@ -8,6 +8,12 @@ This plugin provides integration with [SpatialReal](https://spatialreal.com)'s a
 pip install livekit-plugins-spatialreal
 ```
 
+### Versioning
+
+Starting with 1.7.1, the plugin's major and minor version track the `livekit-agents`
+release it was validated against (e.g. plugin 1.7.x targets `livekit-agents` 1.7.x). The
+patch number is the plugin's own and may advance independently.
+
 Or install from source:
 
 ```bash
@@ -27,6 +33,8 @@ SPATIALREAL_AVATAR_ID=your-avatar-id
 # Optional
 SPATIALREAL_CONSOLE_ENDPOINT=
 SPATIALREAL_INGRESS_ENDPOINT=
+# Max seconds of per-response audio retained for false-interruption resume (default 180, min 10)
+SPATIALREAL_RESUME_BUFFER_MAX_SECONDS=
 
 # LiveKit credentials
 LIVEKIT_URL=
@@ -110,6 +118,25 @@ Main class for integrating SpatialReal avatars with LiveKit agents.
 When starting, the plugin automatically sets `lk.publish_on_behalf` to the
 agent participant identity for avatar worker association in LiveKit frontends.
 
+#### Events
+
+- `playback_started` — emitted with an `AvatarPlaybackStartedEvent` when audible avatar
+  playback is first observed for a request.
+
+```python
+@avatar.on("playback_started")
+def _on_playback_started(ev: spatialreal.AvatarPlaybackStartedEvent):
+    logger.info("avatar playing request %s (via %s)", ev.request_id, ev.source)
+```
+
+### `AvatarPlaybackStartedEvent`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `request_id` | `str` | SpatialReal request the playback belongs to |
+| `source` | `str` | Signal that observed the start (e.g. `livekit_avatar_audio_track`) |
+| `observed_at` | `float` | Unix timestamp of the observation |
+
 ### `SpatialRealException`
 
 Exception raised for SpatialReal-related errors.
@@ -120,6 +147,20 @@ Exception raised for SpatialReal-related errors.
 2. Audio frames are forwarded to SpatialReal's avatar service
 3. SpatialReal generates lip-synced video and audio
 4. The avatar joins the LiveKit room and publishes the synchronized streams
+
+### Interruptions and false-interruption recovery
+
+LiveKit Agents owns turn-taking and interruption decisions; the plugin never adds its own VAD
+or interruption policy. The audio output the plugin installs advertises pause support, so the
+framework's `resume_false_interruption` behaviour (on by default) works with the avatar:
+
+- When the framework detects a possible interruption it calls `pause()`. The plugin stops the
+  current SpatialReal request and retains the unplayed PCM tail locally.
+- If the framework later rejects the interruption (a laugh, a backchannel, a cough), it calls
+  `resume()`. The plugin re-sends only the estimated unplayed remainder as a new request.
+- If the interruption is confirmed, `clear_buffer()` discards the retained audio.
+
+The retained tail is bounded by `SPATIALREAL_RESUME_BUFFER_MAX_SECONDS`.
 
 ## License
 

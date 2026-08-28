@@ -26,6 +26,9 @@ dependencies = [
     "avatarkit>=0.1.7",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
 [project.urls]
 Documentation = "https://docs.spatialreal.com"
 Website = "https://www.spatialreal.ai/"
